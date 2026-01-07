@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Function Practice (10 Questions)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+          onload="renderMathInElement(document.body, {delimiters: [ {left: '$', right: '$', display: false}, {left: '\\(', right: '\\)', display: false}, {left: '$$', right: '$$', display: true}, {left: '\\[', right: '\\]', display: true} ]})"></script>
+  <style>
+    :root { --bg: #0b1021; --panel: #121735; --text: #e7e9f2; --muted: #b9bfd7; --acc: #6aa2ff; --ok:#2ecc71; --bad:#ff6b6b; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: var(--bg); color: var(--text); }
+    a { color: var(--acc); }
+    .wrap { max-width: 960px; margin: 32px auto; padding: 0 16px; }
+    header { margin-bottom: 24px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 24px; }
+    button, input { background: var(--panel); color: var(--text); border: 1px solid #1e2652; padding: 10px 12px; border-radius: 10px; font-size: 14px; }
+    button { cursor: pointer; }
+    button:hover { border-color: #2c3a82; }
+    .question { background: var(--panel); border: 1px solid #1e2652; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .q-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .q-title { font-weight: 600; }
+    .latex { font-size: 18px; }
+    .q-body { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .row { display: grid; grid-template-columns: 160px 1fr; gap: 10px; align-items: center; }
+    .row input { width: 100%; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .msg { font-size: 13px; }
+    .ok { color: var(--ok); }
+    .bad { color: var(--bad); }
+    .footer { margin-top: 24px; font-size: 13px; color: var(--muted); }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Function Practice</h1>
+      <div class="muted">10 questions. For each, evaluate the given function at the provided value of x. Compute it yourself, then click Reveal to see the correct value. All functions are rendered in LaTeX.</div>
+      <div class="controls">
+        <button id="regen">New Set of 10</button>
+        <label class="muted"><input type="checkbox" id="radians" checked style="vertical-align: middle; margin-right: 6px;">Use radians for sin/cos</label>
+      </div>
+    </header>
+
+    <div id="questions"></div>
+
+    <div class="footer">Types included: polynomials, rational functions, square roots, sin/cos, log, and exp. Ensure your x is in the domain (denominator nonzero, square root nonnegative, log positive).</div>
+  </div>
+
+  <script>
+    // Wait until DOM is ready so deferred KaTeX scripts are loaded
+    window.addEventListener('DOMContentLoaded', () => {
+    // Utility: random helpers
+    const randInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a; // inclusive
+    const randChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const randNonZeroInt = (a, b) => {
+      let v = 0; while (v === 0) v = randInt(a, b); return v;
+    };
+
+    // Pretty-print coefficient for LaTeX
+    function coefToLatex(c, varTerm = '') {
+      if (c === 0) return '0';
+      if (varTerm === '') return String(c);
+      if (c === 1) return varTerm;
+      if (c === -1) return '-' + varTerm;
+      return c + varTerm;
+    }
+
+    // Generators return: { latex: string, evalAt(x, opts): number, inDomain(x, opts): boolean }
+    function genPolynomial() {
+      // degree 1-3
+      const degree = randChoice([1, 2, 3]);
+      const coeffs = Array.from({length: degree + 1}, (_, i) => randInt(-6, 6));
+      if (coeffs[degree] === 0) coeffs[degree] = randNonZeroInt(-6, 6);
+      const parts = [];
+      for (let p = degree; p >= 0; p--) {
+        const c = coeffs[p];
+        if (c === 0) continue;
+        const term = p === 0 ? String(Math.abs(c)) : (p === 1 ? 'x' : `x^{${p}}`);
+        const piece = (parts.length === 0 && c < 0) ? '-' + coefToLatex(Math.abs(c), term) : coefToLatex(c, term);
+        parts.push(piece);
+      }
+      const latex = `f(x) = ${parts.length ? parts.join(' + ').replace(/\+ -/g, '- ') : '0'}`;
+      const evalAt = (x) => coeffs.reduce((acc, c, p) => acc + c * Math.pow(x, p), 0);
+      return { latex, evalAt, inDomain: () => true };
+    }
+
+    function genRational() {
+      // (ax^2+bx+c)/(dx+e) or (ax+b)/(cx^2+dx+e)
+      if (Math.random() < 0.5) {
+        const a = randInt(-4, 4), b = randInt(-6, 6), c = randInt(-6, 6);
+        let d = randNonZeroInt(-4, 4), e = randInt(-6, 6);
+        const numLatex = `${coefToLatex(a, 'x^{2}')} + ${coefToLatex(b, 'x')} + ${c}`.replace(/\+ -/g, '- ');
+        const denLatex = `${coefToLatex(d, 'x')} + ${e}`.replace(/\+ -/g, '- ');
+          const latex = `f(x) = \\dfrac{${numLatex}}{${denLatex}}`;
+        const evalAt = (x) => ((a*x*x + b*x + c) / (d*x + e));
+        const inDomain = (x) => (d*x + e) !== 0;
+        return { latex, evalAt, inDomain };
+      } else {
+        let a = randNonZeroInt(-6, 6), b = randInt(-6, 6);
+        let c = randNonZeroInt(-4, 4), d = randInt(-6, 6), e = randInt(1, 6);
+        const numLatex = `${coefToLatex(a, 'x')} + ${b}`.replace(/\+ -/g, '- ');
+        const denLatex = `${coefToLatex(c, 'x^{2}')} + ${coefToLatex(d, 'x')} + ${e}`.replace(/\+ -/g, '- ');
+          const latex = `f(x) = \\dfrac{${numLatex}}{${denLatex}}`;
+        const evalAt = (x) => ((a*x + b) / (c*x*x + d*x + e));
+        const inDomain = (x) => (c*x*x + d*x + e) !== 0;
+        return { latex, evalAt, inDomain };
+      }
+    }
+
+    function genSqrt() {
+      // sqrt(ax^2 + bx + c), ensure c>=1 to have some nonnegative values
+      let a = randInt(-3, 5), b = randInt(-6, 6), c = randInt(0, 10);
+      if (a === 0 && b === 0 && c === 0) c = 1;
+      const innerLatex = `${coefToLatex(a, 'x^{2}')} + ${coefToLatex(b, 'x')} + ${c}`.replace(/\+ -/g, '- ');
+        const latex = `f(x) = \\sqrt{${innerLatex}}`;
+      const evalAt = (x) => Math.sqrt(a*x*x + b*x + c);
+      const inDomain = (x) => (a*x*x + b*x + c) >= 0;
+      return { latex, evalAt, inDomain };
+    }
+
+    function genTrig() {
+      // combinations like sin(ax+b), cos(ax+b), or x*sin(x)
+      const a = randNonZeroInt(-4, 4), b = randInt(-6, 6), k = randInt(-4, 4);
+      const choice = randChoice(['sin', 'cos', 'xsin', 'xcos']);
+      const argLatex = `${coefToLatex(a, 'x')} ${b>=0?'+':''} ${b}`.replace(/\+ -/g, '- ');
+      if (choice === 'sin') {
+          const latex = `f(x) = \\sin(${argLatex})`;
+        const evalAt = (x, opts) => Math.sin((a*x + b) * (opts && !opts.radians ? Math.PI/180 : 1));
+        return { latex, evalAt, inDomain: () => true };
+      } else if (choice === 'cos') {
+          const latex = `f(x) = \\cos(${argLatex})`;
+        const evalAt = (x, opts) => Math.cos((a*x + b) * (opts && !opts.radians ? Math.PI/180 : 1));
+        return { latex, evalAt, inDomain: () => true };
+      } else if (choice === 'xsin') {
+          const latex = `f(x) = x \\cdot \\sin(${argLatex})`;
+        const evalAt = (x, opts) => x * Math.sin((a*x + b) * (opts && !opts.radians ? Math.PI/180 : 1));
+        return { latex, evalAt, inDomain: () => true };
+      } else {
+          const latex = `f(x) = x \\cdot \\cos(${argLatex})`;
+        const evalAt = (x, opts) => x * Math.cos((a*x + b) * (opts && !opts.radians ? Math.PI/180 : 1));
+        return { latex, evalAt, inDomain: () => true };
+      }
+    }
+
+    function genLogExp() {
+      // log(ax + b) or e^{ax+b} or a^{x}
+      const t = randChoice(['ln', 'exp', 'pow']);
+      if (t === 'ln') {
+        let a = randNonZeroInt(-6, 6), b = randInt(-6, 6);
+        const innerLatex = `${coefToLatex(a, 'x')} + ${b}`.replace(/\+ -/g, '- ');
+          const latex = `f(x) = \\ln(${innerLatex})`;
+        const evalAt = (x) => Math.log(a*x + b);
+        const inDomain = (x) => (a*x + b) > 0;
+        return { latex, evalAt, inDomain };
+      } else if (t === 'exp') {
+        let a = randNonZeroInt(-4, 4), b = randInt(-6, 6);
+        const innerLatex = `${coefToLatex(a, 'x')} + ${b}`.replace(/\+ -/g, '- ');
+        const latex = `f(x) = e^{${innerLatex}}`;
+        const evalAt = (x) => Math.exp(a*x + b);
+        return { latex, evalAt, inDomain: () => true };
+      } else {
+        let base = randChoice([2, 3, 4, 5, 7]);
+        const latex = `f(x) = ${base}^{x}`;
+        const evalAt = (x) => Math.pow(base, x);
+        return { latex, evalAt, inDomain: () => true };
+      }
+    }
+
+    const generators = [genPolynomial, genRational, genSqrt, genTrig, genLogExp];
+
+    function generateQuestions(n = 10) {
+      const qs = [];
+      for (let i = 0; i < n; i++) {
+        const gen = randChoice(generators);
+        qs.push(gen());
+      }
+      return qs;
+    }
+
+    function fmtNumber(val) {
+      if (!isFinite(val)) return String(val);
+      // use up to 6 sig figs, avoid scientific unless large/small
+      const abs = Math.abs(val);
+      if ((abs !== 0 && (abs < 1e-4 || abs >= 1e6))) {
+        return val.toExponential(4);
+      }
+      return Math.round(val * 1e6) / 1e6 + '';
+    }
+
+    // Pick a preset x for each question that is in the domain and yields a finite value
+    function pickX(q) {
+      const candidates = [];
+      for (let i = -5; i <= 5; i++) candidates.push(i);
+      // Try random candidates first
+      for (let t = 0; t < 50; t++) {
+        const x = randChoice(candidates);
+        if (!q.inDomain(x, { radians: true })) continue;
+        const v = q.evalAt(x, { radians: true });
+        if (Number.isFinite(v)) return x;
+      }
+      // Fallback: scan a wider integer range
+      for (let x = -10; x <= 10; x++) {
+        if (!q.inDomain(x, { radians: true })) continue;
+        const v = q.evalAt(x, { radians: true });
+        if (Number.isFinite(v)) return x;
+      }
+      return 0; // last resort
+    }
+
+    function renderQuestions(container, qs) {
+      container.innerHTML = '';
+      const radiansToggle = document.getElementById('radians');
+      qs.forEach((q, idx) => {
+        const card = document.createElement('div');
+        card.className = 'question';
+        const x0 = pickX(q);
+        card.innerHTML = `
+          <div class="q-head">
+            <div class="q-title">Question ${idx + 1}</div>
+            <div class="latex" id="latex-${idx}"></div>
+          </div>
+          <div class="q-body">
+            <div class="row">
+              <label>Evaluate at:</label>
+              <div>x = <strong>${x0}</strong></div>
+            </div>
+            <div class="actions">
+              <button id="reveal-${idx}">Reveal</button>
+              <div id="msg-${idx}" class="msg"></div>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+        if (window.katex && window.katex.render) {
+          try {
+            window.katex.render(q.latex, card.querySelector(`#latex-${idx}`), { displayMode: true, throwOnError: false });
+          } catch (e) {
+            card.querySelector(`#latex-${idx}`).textContent = q.latex;
+          }
+        } else {
+          card.querySelector(`#latex-${idx}`).textContent = q.latex;
+        }
+
+        const msgEl = card.querySelector(`#msg-${idx}`);
+        const setMsg = (text, ok) => {
+          msgEl.textContent = text;
+          msgEl.className = 'msg ' + (ok === true ? 'ok' : ok === false ? 'bad' : '');
+        };
+
+        const opts = () => ({ radians: radiansToggle.checked });
+
+        card.querySelector(`#reveal-${idx}`).addEventListener('click', () => {
+          if (!q.inDomain(x0, opts())) { setMsg('x is not in the domain for this function.', false); return; }
+          const truth = q.evalAt(x0, opts());
+          if (!Number.isFinite(truth)) { setMsg('f(x) is not a finite number at this x.', false); return; }
+          setMsg(`f(${x0}) = ${fmtNumber(truth)}.`, true);
+        });
+      });
+      // No need to auto-render; we directly render each formula above.
+    }
+
+    const container = document.getElementById('questions');
+    let current = generateQuestions(10);
+    renderQuestions(container, current);
+
+    document.getElementById('regen').addEventListener('click', () => {
+      current = generateQuestions(10);
+      renderQuestions(container, current);
+    });
+    });
+  </script>
+</body>
+</html>
