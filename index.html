@@ -84,9 +84,12 @@
       for (let p = degree; p >= 0; p--) {
         const c = coeffs[p];
         if (c === 0) continue;
-        const term = p === 0 ? String(Math.abs(c)) : (p === 1 ? 'x' : `x^{${p}}`);
-        const piece = (parts.length === 0 && c < 0) ? '-' + coefToLatex(Math.abs(c), term) : coefToLatex(c, term);
-        parts.push(piece);
+        if (p === 0) {
+          parts.push(String(c));
+        } else {
+          const term = p === 1 ? 'x' : `x^{${p}}`;
+          parts.push(coefToLatex(c, term));
+        }
       }
       const latex = `f(x) = ${parts.length ? parts.join(' + ').replace(/\+ -/g, '- ') : '0'}`;
       const evalAt = (x) => coeffs.reduce((acc, c, p) => acc + c * Math.pow(x, p), 0);
